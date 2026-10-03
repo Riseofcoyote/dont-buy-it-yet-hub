@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-02T21:10:00-04:00",
+  "updatedAt": "2026-10-03T01:36:43.303Z",
   "projects": [
     {
       "id": "roborock-qrevo-2-pro-first-review",
@@ -18,7 +18,8 @@
       "aiJobs": [],
       "assistantOutput": "",
       "createdAt": "2026-10-02T20:55:00-04:00",
-      "updatedAt": "2026-10-02T20:55:00-04:00"
+      "updatedAt": "2026-10-02T20:55:00-04:00",
+      "dropboxFolder": "/DON'T BUY IT YET/Roborock Qrevo 2 Pro"
     }
   ]
 }
