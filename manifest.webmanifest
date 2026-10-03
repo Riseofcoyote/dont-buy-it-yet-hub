@@ -3,7 +3,7 @@
   "short_name":"DBIY Hub",
   "start_url":"./",
   "display":"standalone",
-  "background_color":"#0b0b0f",
-  "theme_color":"#0b0b0f",
+  "background_color":"#12091f",
+  "theme_color":"#25113b",
   "description":"Mobile-first product review production tracker."
 }
