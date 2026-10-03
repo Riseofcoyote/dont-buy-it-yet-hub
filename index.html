@@ -46,10 +46,15 @@
         <button class="secondary command-preset" data-command="Create a rough-cut edit plan from the available clips, voice-over, and B-roll.">Build Rough Cut</button>
         <button class="secondary command-preset" data-command="Create the thumbnail concept, YouTube title, description, tags, and affiliate placement.">Finish Publish Package</button>
       </div>
+      <div class="provider-row">
+        <button class="provider-btn active" data-provider="chatgpt">ChatGPT</button>
+        <button class="provider-btn" data-provider="claude">Claude</button>
+        <button class="provider-btn" data-provider="gemini">Gemini</button>
+      </div>
       <div class="ai-actions">
-        <button id="shareTaskBtn" class="primary">Send Command to ChatGPT</button>
+        <button id="shareTaskBtn" class="primary">Send Command</button>
         <button id="syncChatGPTBtn" class="secondary">Sync Finished Work</button>
-        <a class="secondary action-link" href="https://chatgpt.com/" target="_blank" rel="noreferrer">Open ChatGPT</a>
+        <button id="openProviderBtn" class="secondary">Open Selected AI</button>
       </div>
       <div id="aiSyncStatus" class="muted ai-sync-status">Free bridge: commands can be shared to ChatGPT; finished project updates sync from GitHub.</div>
     </section>
@@ -115,6 +120,11 @@
           <button type="button" class="secondary project-command-preset" data-command="Build a scene-by-scene edit plan using the available assets and voice-over.">Plan Edit</button>
           <button type="button" class="secondary project-command-preset" data-command="Create a rough cut from the available clips and voice-over, then return the finished video to the project.">Create Rough Cut</button>
           <button type="button" class="secondary project-command-preset" data-command="Review the current project and tell me the single most important next action.">What’s Next?</button>
+        </div>
+        <div class="provider-row compact">
+          <button type="button" class="project-provider-btn active" data-provider="chatgpt">ChatGPT</button>
+          <button type="button" class="project-provider-btn" data-provider="claude">Claude</button>
+          <button type="button" class="project-provider-btn" data-provider="gemini">Gemini</button>
         </div>
         <div class="studio-actions">
           <button type="button" id="sendProjectCommandBtn" class="primary">Send Project Command</button>
