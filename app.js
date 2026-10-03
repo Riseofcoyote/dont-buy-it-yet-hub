@@ -113,7 +113,65 @@ form.addEventListener('submit',e=>{
 });
 
 function loadProjects(){
-  try{return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];}catch{return []}
+  try{
+    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(Array.isArray(saved) && saved.length) return saved;
+  }catch{}
+  return [{
+    id:'roborock-qrevo-2-pro-first-review',
+    name:'Roborock Qrevo 2 Pro',
+    productUrl:'https://us.roborock.com/products/roborock-qrevo-2-pro',
+    affiliateUrl:'',
+    stage:'Script',
+    notes:`FIRST DON’T BUY IT YET REVIEW
+
+Working angle: “Roborock Qrevo 2 Pro: DON’T BUY IT Until You Know These 7 Things”
+
+Research check — Oct. 2, 2026:
+• Official U.S. listing: 20,000 Pa HyperForce suction.
+• Official U.S. price observed: $549.99 vs $799.99 list price.
+• Official features: dual anti-tangle system, auto mop detachment for carpets, reversible side brush/corner coverage, multifunction dock, app control.
+• Roborock Fall Prime Day page lists $484.99 for the Oct. 6–11 main-event window. Recheck price immediately before publishing.
+• Recent WIRED hands-on review praised vacuuming/mopping and corner cleaning, but reported trouble detecting cords, cat toys and other small objects; spill cleanup was a weaker area.
+• Recent TechRadar testing found excellent mopping and good vacuuming, but noted the tall LiDAR limits low-furniture clearance, the dock needs floor space, disposable dust bags add running cost, and a charging cable caused trouble.
+
+VOICE LANGUAGE RULE:
+Say “I researched…”, “Roborock says…”, “WIRED found…”, “TechRadar found…”, or “reviewers reported…”. Do NOT say “I tested” because we do not own/test this unit.
+
+Production target:
+0:00–0:20 hook
+0:20–1:00 price / what it is
+1:00–2:00 core features
+2:00–3:30 strengths
+3:30–5:00 problems / complaints
+5:00–6:30 alternatives / value
+6:30–7:30 who should buy
+7:30–8:30 who should skip
+8:30–9:00 conclusion / CTA`,
+    voiceChunks:`Before you spend your money, let’s find out if this product is actually worth it. I’m Rock, and this is Don’t Buy It Yet. We’ll look at what it does well, where it falls short, and whether it deserves your money.`,
+    broll:`Hook: black Qrevo 2 Pro + dock hero shot
+Official 20,000 Pa suction graphic
+Current official price / MSRP screen
+Auto mop removal demonstration or official graphic
+Dual anti-tangle brush close-up
+Reversible side brush / corner-cleaning shot
+Multifunction dock shot
+App / mapping screen
+Cable and small-toy obstacle warning graphic
+Low-furniture clearance illustration
+Disposable dust-bag / running-cost visual
+Mixed hard-floor + carpet lifestyle B-roll
+Closing product hero shot + DON’T BUY IT YET branding`,
+    youtubeTitle:'Roborock Qrevo 2 Pro: DON’T BUY IT Until You Know These 7 Things',
+    youtubeDescription:`Roborock’s Qrevo 2 Pro packs 20,000 Pa suction, automatic mop removal, anti-tangle cleaning and a multifunction dock — but there are a few things worth knowing before you buy.
+
+In this research-based review, we break down the features, recent independent testing, drawbacks and who this robot vacuum is actually best for.
+
+Check the current price using the affiliate link added below before publishing.`,
+    youtubeTags:'Roborock Qrevo 2 Pro, robot vacuum review, Roborock review, robot vacuum and mop, don’t buy it yet, smart home',
+    createdAt:'2026-10-02T20:55:00-04:00',
+    updatedAt:'2026-10-02T20:55:00-04:00'
+  }];
 }
 function saveProjects(){localStorage.setItem(STORAGE_KEY,JSON.stringify(projects));}
 function stageIndex(stage){return Math.max(0,STAGES.indexOf(stage));}
