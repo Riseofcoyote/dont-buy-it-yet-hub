@@ -113,6 +113,11 @@
         <div class="muted studio-copy">Keep quick local clips here. Add Drive/Dropbox links for assets you want ChatGPT to access remotely.</div>
         <label class="video-picker">Add local clips / images / audio<input id="assetInput" type="file" accept="video/*,image/*,audio/*" multiple /></label>
         <div id="assetGrid" class="asset-grid"></div>
+        <label>Dropbox project vault<input id="dropboxFolder" placeholder="/DON'T BUY IT YET/Product Name" /></label>
+        <div class="inline-actions">
+          <a class="secondary action-link" href="https://www.dropbox.com/home" target="_blank" rel="noreferrer">Open Dropbox Vault</a>
+          <button type="button" class="secondary project-command-preset" data-command="Organize the current project assets in Dropbox using the project vault path. Preserve originals unless I explicitly say move them.">Organize Dropbox</button>
+        </div>
         <label>Cloud asset links<textarea id="cloudAssets" rows="4" placeholder="One Google Drive, Dropbox, product, or B-roll URL per line"></textarea></label>
         <label>Command for ChatGPT<textarea id="projectCommand" rows="4" placeholder="Example: Use these clips to make a 45-second rough cut. Put the strongest product shot in the first 2 seconds."></textarea></label>
         <div class="command-presets">
