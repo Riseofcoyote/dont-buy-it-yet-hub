@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0b0f" />
+  <meta name="theme-color" content="#25113b" />
   <title>DON'T BUY IT YET — Production Hub</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
@@ -29,6 +29,29 @@
         <div class="stat"><span id="readyCount">0</span><small>Ready</small></div>
         <div class="stat"><span id="publishedCount">0</span><small>Published</small></div>
       </div>
+    </section>
+
+    <section class="panel ai-control">
+      <div class="section-head">
+        <div>
+          <div class="panel-title">AI PRODUCTION CONTROL</div>
+          <div class="muted">Tell ChatGPT what to fetch, build, edit, or publish for the current review.</div>
+        </div>
+        <span class="ai-status">COMMAND CENTER</span>
+      </div>
+      <textarea id="globalCommand" rows="3" placeholder="Example: Find 6 usable B-roll clips for the Roborock review, organize them by scene, then update the project."></textarea>
+      <div class="command-presets">
+        <button class="secondary command-preset" data-command="Fetch B-roll for the current review and organize it by scene.">Fetch B-roll</button>
+        <button class="secondary command-preset" data-command="Finish the review script and break it into Chatterbox-ready voice chunks.">Build Voice-over</button>
+        <button class="secondary command-preset" data-command="Create a rough-cut edit plan from the available clips, voice-over, and B-roll.">Build Rough Cut</button>
+        <button class="secondary command-preset" data-command="Create the thumbnail concept, YouTube title, description, tags, and affiliate placement.">Finish Publish Package</button>
+      </div>
+      <div class="ai-actions">
+        <button id="shareTaskBtn" class="primary">Send Command to ChatGPT</button>
+        <button id="syncChatGPTBtn" class="secondary">Sync Finished Work</button>
+        <a class="secondary action-link" href="https://chatgpt.com/" target="_blank" rel="noreferrer">Open ChatGPT</a>
+      </div>
+      <div id="aiSyncStatus" class="muted ai-sync-status">Free bridge: commands can be shared to ChatGPT; finished project updates sync from GitHub.</div>
     </section>
 
     <section class="toolbox panel">
@@ -79,6 +102,29 @@
       <label>Script / notes<textarea id="notes" rows="7" placeholder="Paste the script, research notes, hooks, or directions here..."></textarea></label>
       <label>Voice chunks<textarea id="voiceChunks" rows="6" placeholder="Put each Chatterbox chunk on a new line."></textarea></label>
       <label>B-roll shot list<textarea id="broll" rows="6" placeholder="One shot per line: product hero shot, person using it, close-up feature..."></textarea></label>
+
+      <section class="studio-box">
+        <div class="panel-title">ASSET BIN + BUILD STUDIO</div>
+        <div class="muted studio-copy">Keep quick local clips here. Add Drive/Dropbox links for assets you want ChatGPT to access remotely.</div>
+        <label class="video-picker">Add local clips / images / audio<input id="assetInput" type="file" accept="video/*,image/*,audio/*" multiple /></label>
+        <div id="assetGrid" class="asset-grid"></div>
+        <label>Cloud asset links<textarea id="cloudAssets" rows="4" placeholder="One Google Drive, Dropbox, product, or B-roll URL per line"></textarea></label>
+        <label>Command for ChatGPT<textarea id="projectCommand" rows="4" placeholder="Example: Use these clips to make a 45-second rough cut. Put the strongest product shot in the first 2 seconds."></textarea></label>
+        <div class="command-presets">
+          <button type="button" class="secondary project-command-preset" data-command="Find and add missing B-roll for this review.">Find Missing B-roll</button>
+          <button type="button" class="secondary project-command-preset" data-command="Build a scene-by-scene edit plan using the available assets and voice-over.">Plan Edit</button>
+          <button type="button" class="secondary project-command-preset" data-command="Create a rough cut from the available clips and voice-over, then return the finished video to the project.">Create Rough Cut</button>
+          <button type="button" class="secondary project-command-preset" data-command="Review the current project and tell me the single most important next action.">What’s Next?</button>
+        </div>
+        <div class="studio-actions">
+          <button type="button" id="sendProjectCommandBtn" class="primary">Send Project Command</button>
+          <a class="secondary action-link" href="https://github.com/ffmpegwasm/ffmpeg.wasm" target="_blank" rel="noreferrer">Browser Video Engine</a>
+        </div>
+        <div class="job-heading">JOB QUEUE</div>
+        <div id="jobQueue" class="job-queue"></div>
+        <div class="job-heading">LATEST CHATGPT OUTPUT</div>
+        <div id="assistantOutput" class="assistant-output muted">No synced output yet.</div>
+      </section>
 
       <section class="publish-box">
         <div class="panel-title">PUBLISH TO YOUTUBE</div>
