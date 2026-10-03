@@ -108,6 +108,23 @@
       <label>Voice chunks<textarea id="voiceChunks" rows="6" placeholder="Put each Chatterbox chunk on a new line."></textarea></label>
       <label>B-roll shot list<textarea id="broll" rows="6" placeholder="One shot per line: product hero shot, person using it, close-up feature..."></textarea></label>
 
+      <section class="current-cut-box">
+        <div class="section-head">
+          <div>
+            <div class="panel-title">CURRENT CUT</div>
+            <div class="muted studio-copy">Watch the latest rendered review without leaving the Production Hub.</div>
+          </div>
+          <span id="currentCutStatus" class="ai-status">NO VIDEO</span>
+        </div>
+        <div id="currentCutPlayer" class="current-cut-player">
+          <div class="empty">No review video linked yet.</div>
+        </div>
+        <div class="current-cut-actions">
+          <button type="button" id="reloadCurrentCutBtn" class="secondary">Reload Player</button>
+          <a id="openCurrentCutBtn" class="primary action-link" href="#" target="_blank" rel="noreferrer">Open / Fullscreen</a>
+        </div>
+      </section>
+
       <section class="studio-box">
         <div class="panel-title">ASSET BIN + BUILD STUDIO</div>
         <div class="muted studio-copy">Keep quick local clips here. Add Drive/Dropbox links for assets you want ChatGPT to access remotely.</div>
