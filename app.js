@@ -43,6 +43,7 @@ document.getElementById('shareTaskBtn').addEventListener('click',async()=>{
   await queueAndShareCommand(p.id,command,selectedProvider);
 });
 document.getElementById('syncChatGPTBtn').addEventListener('click',syncFromGitHub);
+document.getElementById('reloadCurrentCutBtn').addEventListener('click',()=>renderCurrentCut(projects.find(x=>x.id===activeProjectId)));
 document.getElementById('sendProjectCommandBtn').addEventListener('click',async()=>{
   if(!activeProjectId){alert('Save this review first, then send the command.');return;}
   const command=document.getElementById('projectCommand').value.trim();
@@ -263,11 +264,41 @@ function openProject(id=null){
   document.getElementById('projectCommand').value='';
   renderJobQueue(p);
   document.getElementById('assistantOutput').textContent=p?.assistantOutput||'No synced output yet.';
+  renderCurrentCut(p);
   if(p) renderAssetGrid(p.id); else document.getElementById('assetGrid').innerHTML='<div class="empty">Save the review before adding local assets.</div>';
   selectedFinalVideo=null; finalVideoInput.value='';
   document.getElementById('selectedVideoName').textContent='No video selected.';
   document.getElementById('deleteBtn').style.visibility=p?'visible':'hidden';
   dialog.showModal();
+}
+function getReviewUrl(p){
+  if(!p) return '';
+  if(p.reviewUrl) return p.reviewUrl;
+  const assets=Array.isArray(p.cloudAssets)?p.cloudAssets:[];
+  return assets.find(u=>/share\.descript\.com\/view\//i.test(u)) || '';
+}
+function renderCurrentCut(p){
+  const host=document.getElementById('currentCutPlayer');
+  const status=document.getElementById('currentCutStatus');
+  const open=document.getElementById('openCurrentCutBtn');
+  if(!host||!status||!open) return;
+  const url=getReviewUrl(p);
+  if(!url){
+    status.textContent='NO VIDEO';
+    host.innerHTML='<div class="empty">No review video linked yet.</div>';
+    open.href='#'; open.style.pointerEvents='none'; open.style.opacity='.5';
+    return;
+  }
+  status.textContent='READY TO WATCH';
+  open.href=url; open.style.pointerEvents=''; open.style.opacity='';
+  host.innerHTML='';
+  const frame=document.createElement('iframe');
+  frame.src=url;
+  frame.title=(p?.name||'Current review')+' current cut';
+  frame.allow='autoplay; fullscreen; picture-in-picture';
+  frame.allowFullscreen=true;
+  frame.loading='eager';
+  host.appendChild(frame);
 }
 function advanceProject(id){
   const p=projects.find(x=>x.id===id); if(!p) return;
