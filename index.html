@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0f" />
+  <title>DON'T BUY IT YET — Production Hub</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">PRODUCT REVIEW WORKFLOW</div>
+      <h1>DON'T BUY IT YET</h1>
+    </div>
+    <button id="addProjectBtn" class="primary">+ New Review</button>
+  </header>
+
+  <main>
+    <section class="hero-grid">
+      <div class="panel next-panel">
+        <div class="panel-title">NEXT TASK</div>
+        <div id="nextTaskText" class="next-task">Add your first product review.</div>
+        <button id="nextTaskBtn" class="action-btn">Open Current Review</button>
+      </div>
+      <div class="panel stats-panel">
+        <div class="stat"><span id="activeCount">0</span><small>Active</small></div>
+        <div class="stat"><span id="readyCount">0</span><small>Ready</small></div>
+        <div class="stat"><span id="publishedCount">0</span><small>Published</small></div>
+      </div>
+    </section>
+
+    <section class="toolbox panel">
+      <div class="panel-title">TOOLS</div>
+      <div class="tool-grid">
+        <a class="tool" href="https://huggingface.co/spaces/ResembleAI/Chatterbox" target="_blank" rel="noreferrer">🎙️ <span>Chatterbox</span><small>Voice clone</small></a>
+        <a class="tool" href="https://videotoaudioconverter.org" target="_blank" rel="noreferrer">🎧 <span>Audio Extractor</span><small>Video → WAV</small></a>
+        <a class="tool" href="https://github.com/Mr-funny/hbg-free-material" target="_blank" rel="noreferrer">🎥 <span>Free B-roll</span><small>Pexels/Pixabay</small></a>
+        <a class="tool" href="https://github.com/SysAdminDoc/Stock-Video-Collector" target="_blank" rel="noreferrer">🗂️ <span>Video Library</span><small>Catalog B-roll</small></a>
+        <a class="tool" href="https://drive.google.com" target="_blank" rel="noreferrer">☁️ <span>Google Drive</span><small>Assets</small></a>
+        <a class="tool" href="https://www.dropbox.com" target="_blank" rel="noreferrer">📦 <span>Dropbox</span><small>Source footage</small></a>
+        <a class="tool" href="https://www.capcut.com" target="_blank" rel="noreferrer">✂️ <span>CapCut</span><small>Edit</small></a>
+        <a class="tool" href="https://studio.youtube.com" target="_blank" rel="noreferrer">▶️ <span>YouTube Studio</span><small>Upload / publish</small></a>
+        <a class="tool" href="https://impact.com/partners/influencer-partners/" target="_blank" rel="noreferrer">🔗 <span>Impact</span><small>Affiliate links</small></a>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <div>
+          <div class="panel-title">PRODUCTION BOARD</div>
+          <div class="muted">Tap a review to update its stage or open its workspace.</div>
+        </div>
+        <div class="board-actions">
+          <button id="exportBtn" class="secondary">Export Backup</button>
+          <label class="secondary file-label">Import Backup<input id="importInput" type="file" accept="application/json" hidden /></label>
+        </div>
+      </div>
+      <div id="board" class="board"></div>
+    </section>
+  </main>
+
+  <dialog id="projectDialog">
+    <form method="dialog" id="projectForm">
+      <div class="dialog-head">
+        <h2 id="dialogTitle">New Review</h2>
+        <button value="cancel" class="icon-btn" aria-label="Close">✕</button>
+      </div>
+      <input type="hidden" id="projectId" />
+      <label>Product name<input id="productName" required placeholder="e.g. Shark cordless vacuum" /></label>
+      <label>Product / research link<input id="productUrl" type="url" placeholder="https://..." /></label>
+      <label>Impact affiliate link<input id="affiliateUrl" type="url" placeholder="Paste your Impact tracking link" /></label>
+      <div class="inline-actions">
+        <button type="button" id="copyAffiliateBtn" class="secondary">Copy Impact Link</button>
+        <a class="secondary action-link" href="https://impact.com/partners/influencer-partners/" target="_blank" rel="noreferrer">Open Impact</a>
+      </div>
+      <label>Current stage<select id="stageSelect"></select></label>
+      <label>Script / notes<textarea id="notes" rows="7" placeholder="Paste the script, research notes, hooks, or directions here..."></textarea></label>
+      <label>Voice chunks<textarea id="voiceChunks" rows="6" placeholder="Put each Chatterbox chunk on a new line."></textarea></label>
+      <label>B-roll shot list<textarea id="broll" rows="6" placeholder="One shot per line: product hero shot, person using it, close-up feature..."></textarea></label>
+
+      <section class="publish-box">
+        <div class="panel-title">PUBLISH TO YOUTUBE</div>
+        <label>YouTube title<input id="youtubeTitle" maxlength="100" placeholder="Final YouTube title" /></label>
+        <label>YouTube description<textarea id="youtubeDescription" rows="7" placeholder="Final description, disclosure, product link, chapters, etc."></textarea></label>
+        <label>Keywords / hashtags<input id="youtubeTags" placeholder="product review, don't buy it yet, #review" /></label>
+        <label class="video-picker">Final video file<input id="finalVideoInput" type="file" accept="video/*" /></label>
+        <div id="selectedVideoName" class="selected-file muted">No video selected.</div>
+        <div class="publish-actions">
+          <button type="button" id="copyTitleBtn" class="secondary">Copy Title</button>
+          <button type="button" id="copyDescriptionBtn" class="secondary">Copy Description</button>
+          <button type="button" id="addImpactBtn" class="secondary">Add Impact Link + Disclosure</button>
+          <button type="button" id="shareVideoBtn" class="primary">Share Final Video</button>
+          <a class="secondary action-link" href="https://studio.youtube.com" target="_blank" rel="noreferrer">Open YouTube Studio</a>
+        </div>
+        <div class="publish-note muted">On Android, “Share Final Video” uses the phone share sheet when supported. Choose YouTube there. If YouTube is not offered, use “Open YouTube Studio.”</div>
+      </section>
+      <div class="dialog-actions">
+        <button type="button" id="deleteBtn" class="danger">Delete</button>
+        <span class="spacer"></span>
+        <button value="cancel" class="secondary">Cancel</button>
+        <button type="submit" value="default" class="primary">Save Review</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="cardTemplate">
+    <article class="card">
+      <div class="card-top">
+        <div>
+          <div class="stage-pill"></div>
+          <h3 class="card-title"></h3>
+        </div>
+        <button class="edit-btn">Edit</button>
+      </div>
+      <div class="progress-wrap"><div class="progress"></div></div>
+      <div class="card-meta"></div>
+      <div class="card-buttons">
+        <button class="advance-btn">Next Stage</button>
+        <button class="workspace-btn secondary">Workspace</button>
+      </div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
