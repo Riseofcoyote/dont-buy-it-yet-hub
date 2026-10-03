@@ -5,6 +5,9 @@ const STORAGE_KEY = 'dbiy-production-hub-v1';
 let projects = loadProjects();
 let activeProjectId = null;
 let selectedFinalVideo = null;
+let selectedProvider = 'chatgpt';
+let selectedProjectProvider = 'chatgpt';
+const PROVIDER_URLS = {chatgpt:'https://chatgpt.com/',claude:'https://claude.ai/new',gemini:'https://gemini.google.com/app'};
 const ASSET_DB_NAME = 'dbiy-assets-v1';
 const ASSET_STORE = 'assets';
 
@@ -18,6 +21,17 @@ stageSelect.innerHTML = STAGES.map(s=>`<option>${s}</option>`).join('');
 document.querySelectorAll('.command-preset').forEach(btn=>btn.addEventListener('click',()=>{
   document.getElementById('globalCommand').value=btn.dataset.command||'';
 }));
+document.querySelectorAll('.provider-btn').forEach(btn=>btn.addEventListener('click',()=>{
+  selectedProvider=btn.dataset.provider||'chatgpt';
+  document.querySelectorAll('.provider-btn').forEach(b=>b.classList.toggle('active',b===btn));
+}));
+document.querySelectorAll('.project-provider-btn').forEach(btn=>btn.addEventListener('click',()=>{
+  selectedProjectProvider=btn.dataset.provider||'chatgpt';
+  document.querySelectorAll('.project-provider-btn').forEach(b=>b.classList.toggle('active',b===btn));
+}));
+document.getElementById('openProviderBtn').addEventListener('click',()=>{
+  window.open(PROVIDER_URLS[selectedProvider]||PROVIDER_URLS.chatgpt,'_blank','noopener');
+});
 document.querySelectorAll('.project-command-preset').forEach(btn=>btn.addEventListener('click',()=>{
   document.getElementById('projectCommand').value=btn.dataset.command||'';
 }));
@@ -26,14 +40,14 @@ document.getElementById('shareTaskBtn').addEventListener('click',async()=>{
   const command=document.getElementById('globalCommand').value.trim();
   if(!p){alert('Add a review first.');return;}
   if(!command){alert('Enter a production command first.');return;}
-  await queueAndShareCommand(p.id,command);
+  await queueAndShareCommand(p.id,command,selectedProvider);
 });
 document.getElementById('syncChatGPTBtn').addEventListener('click',syncFromGitHub);
 document.getElementById('sendProjectCommandBtn').addEventListener('click',async()=>{
   if(!activeProjectId){alert('Save this review first, then send the command.');return;}
   const command=document.getElementById('projectCommand').value.trim();
   if(!command){alert('Enter a project command first.');return;}
-  await queueAndShareCommand(activeProjectId,command);
+  await queueAndShareCommand(activeProjectId,command,selectedProjectProvider);
 });
 document.getElementById('assetInput').addEventListener('change',async e=>{
   if(!activeProjectId){alert('Save this review first, then add assets.'); e.target.value=''; return;}
@@ -134,6 +148,7 @@ form.addEventListener('submit',e=>{
     youtubeTitle:document.getElementById('youtubeTitle').value,
     youtubeDescription:document.getElementById('youtubeDescription').value,
     youtubeTags:document.getElementById('youtubeTags').value,
+    dropboxFolder:document.getElementById('dropboxFolder').value.trim(),
     cloudAssets:document.getElementById('cloudAssets').value.split('\n').map(x=>x.trim()).filter(Boolean),
     aiJobs:(projects.find(p=>p.id===(activeProjectId||''))?.aiJobs)||[],
     assistantOutput:(projects.find(p=>p.id===(activeProjectId||''))?.assistantOutput)||'',
@@ -202,6 +217,7 @@ In this research-based review, we break down the features, recent independent te
 
 Check the current price using the affiliate link added below before publishing.`,
     youtubeTags:'Roborock Qrevo 2 Pro, robot vacuum review, Roborock review, robot vacuum and mop, don’t buy it yet, smart home',
+    dropboxFolder:"/DON'T BUY IT YET/Roborock Qrevo 2 Pro",
     cloudAssets:[],
     aiJobs:[],
     assistantOutput:'',
@@ -242,6 +258,7 @@ function openProject(id=null){
   document.getElementById('youtubeTitle').value=p?.youtubeTitle||'';
   document.getElementById('youtubeDescription').value=p?.youtubeDescription||'';
   document.getElementById('youtubeTags').value=p?.youtubeTags||'';
+  document.getElementById('dropboxFolder').value=p?.dropboxFolder||`/DON'T BUY IT YET/${p?.name||'New Review'}`;
   document.getElementById('cloudAssets').value=Array.isArray(p?.cloudAssets)?p.cloudAssets.join('\n'):(p?.cloudAssets||'');
   document.getElementById('projectCommand').value='';
   renderJobQueue(p);
@@ -355,9 +372,9 @@ function renderJobQueue(p){
     el.appendChild(row);
   });
 }
-async function queueAndShareCommand(projectId,command){
+async function queueAndShareCommand(projectId,command,provider='chatgpt'){
   const p=projects.find(x=>x.id===projectId); if(!p) return;
-  const job={id:crypto.randomUUID(),command,status:'Queued',createdAt:new Date().toISOString()};
+  const job={id:crypto.randomUUID(),command,provider,status:'Queued',createdAt:new Date().toISOString()};
   p.aiJobs=[...(p.aiJobs||[]),job]; p.updatedAt=new Date().toISOString(); saveProjects(); render(); if(activeProjectId===p.id) renderJobQueue(p);
   const localAssets=await getLocalAssets(projectId).catch(()=>[]);
   const cloud=(p.cloudAssets||[]);
@@ -368,6 +385,9 @@ Project ID: ${p.id}
 Current stage: ${p.stage}
 Command: ${command}
 
+Dropbox project vault:
+${p.dropboxFolder||'Not set.'}
+
 Cloud assets you can access:
 ${cloud.length?cloud.join('\n'):'None added yet.'}
 
@@ -376,9 +396,15 @@ ${localAssets.length?localAssets.map(a=>'- '+a.name).join('\n'):'None.'}
 
 Use all tools available to you to execute the command. You have permission to update my connected GitHub repo Riseofcoyote/dont-buy-it-yet-hub for this production project. When finished, update projects.json for ONLY project ID "${p.id}". Put a concise result/status in assistantOutput, update relevant project fields, set this job ID "${job.id}" to Completed (or Blocked with the reason), and update updatedAt. Do not overwrite unrelated projects. If a finished downloadable artifact is created, include its accessible link/location in assistantOutput or cloudAssets.`;
   try{
-    if(navigator.share){await navigator.share({title:`Production command — ${p.name}`,text:prompt});}
-    else{await navigator.clipboard.writeText(prompt);window.open('https://chatgpt.com/','_blank','noopener');alert('Command copied. Paste it into ChatGPT.');}
-  }catch(err){if(err?.name!=='AbortError'){try{await navigator.clipboard.writeText(prompt);window.open('https://chatgpt.com/','_blank','noopener');}catch{}}}
+    await navigator.clipboard.writeText(prompt);
+    window.open(PROVIDER_URLS[provider]||PROVIDER_URLS.chatgpt,'_blank','noopener');
+    alert(`Command copied. Paste it into ${provider==='chatgpt'?'ChatGPT':provider==='claude'?'Claude':'Gemini'}.`);
+  }catch(err){
+    try{
+      if(navigator.share) await navigator.share({title:`Production command — ${p.name}`,text:prompt});
+      else throw err;
+    }catch{}
+  }
 }
 async function syncFromGitHub(){
   const status=document.getElementById('aiSyncStatus'); status.textContent='Syncing finished work…';
