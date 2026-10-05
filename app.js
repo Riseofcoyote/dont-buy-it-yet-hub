@@ -44,6 +44,23 @@ document.getElementById('shareTaskBtn').addEventListener('click',async()=>{
 });
 document.getElementById('syncChatGPTBtn').addEventListener('click',syncFromGitHub);
 document.getElementById('reloadCurrentCutBtn').addEventListener('click',()=>renderCurrentCut(projects.find(x=>x.id===activeProjectId)));
+document.getElementById('exportFrontstageJobBtn').addEventListener('click',async()=>{
+  const p=projects.find(x=>x.id===activeProjectId);
+  if(!p){alert('Open a saved review first.');return;}
+  const localAssets=await getLocalAssets(p.id).catch(()=>[]);
+  const job={
+    format:'dbiy-frontstage-job',version:1,createdAt:new Date().toISOString(),
+    project:{id:p.id,name:p.name,stage:p.stage},
+    edit:{voiceoverIsMaster:true,keepSourceAudio:false,target:'1080p MP4',captions:true,
+      directions:'Use the recorded Rock narration as the master timeline. Tighten mistakes/dead air without flattening comedic pauses. Re-time B-roll to narration. Infomercial/on-camera Rock footage is visual-only unless explicitly approved. Preserve evidence cards and research-based-review disclaimer.'},
+    script:p.voiceChunks||'',brollPlan:p.broll||'',notes:p.notes||'',
+    localAssets:localAssets.map(a=>({name:a.name,type:a.type,size:a.size})),
+    cloudAssets:p.cloudAssets||[]
+  };
+  const blob=new Blob([JSON.stringify(job,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(p.id||'review')+'-frontstage-job.json';a.click();URL.revokeObjectURL(a.href);
+  window.open('https://frontstage.studio/','_blank','noopener');
+});
 document.getElementById('sendProjectCommandBtn').addEventListener('click',async()=>{
   if(!activeProjectId){alert('Save this review first, then send the command.');return;}
   const command=document.getElementById('projectCommand').value.trim();
