@@ -166,8 +166,11 @@ async function writeFrontstageProject(dir,p,assets,job){
     const isNarration=a.role==='narration-master';
     let exportAsset=a, exportType=sourceType;
     if(isNarration && sourceType==='video'){
-      const wav=await narrationToWav(a);
-      exportAsset={...a,blob:wav.blob,name:wav.name,type:wav.type}; exportType='audio';
+      // Keep the original MP4 intact. Android screen recordings can contain AAC audio
+      // that WebAudio decodes incorrectly/silently even though native playback is fine.
+      // Mark it as video in media.json; the timeline still uses an audio clip so
+      // Frontstage extracts/decodes the embedded AAC itself.
+      exportAsset=a; exportType='video';
     }
     const name=safeMediaName(exportAsset.name,i), duration=await mediaDuration(exportAsset), id=crypto.randomUUID();
     await writeBlobFile(mediaDir,name,exportAsset.blob);
