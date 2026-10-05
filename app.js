@@ -48,19 +48,98 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
   const p=projects.find(x=>x.id===activeProjectId);
   if(!p){alert('Open a saved review first.');return;}
   const localAssets=await getLocalAssets(p.id).catch(()=>[]);
-  const job={
-    format:'dbiy-frontstage-job',version:1,createdAt:new Date().toISOString(),
+  const job=makeFrontstageJob(p,localAssets);
+  try{
+    if('showDirectoryPicker' in window){
+      const dir=await window.showDirectoryPicker({mode:'readwrite'});
+      await writeFrontstageProject(dir,p,localAssets,job);
+      alert('Frontstage project built. In Frontstage choose File → Open and select the folder you just chose.');
+    }else{
+      downloadJson((p.id||'review')+'-frontstage-job.json',job);
+      alert('Your browser does not expose project-folder access here, so I prepared the production job instead.');
+    }
+    window.open('https://frontstage.studio/','_blank','noopener');
+  }catch(err){
+    if(err?.name==='AbortError') return;
+    console.error(err);
+    downloadJson((p.id||'review')+'-frontstage-job.json',job);
+    alert('Direct Frontstage project creation was blocked by the browser. I downloaded the production job as a fallback.');
+    window.open('https://frontstage.studio/','_blank','noopener');
+  }
+});
+
+function makeFrontstageJob(p,localAssets){
+  return {
+    format:'dbiy-frontstage-job',version:2,createdAt:new Date().toISOString(),
     project:{id:p.id,name:p.name,stage:p.stage},
     edit:{voiceoverIsMaster:true,keepSourceAudio:false,target:'1080p MP4',captions:true,
-      directions:'Use the recorded Rock narration as the master timeline. Tighten mistakes/dead air without flattening comedic pauses. Re-time B-roll to narration. Infomercial/on-camera Rock footage is visual-only unless explicitly approved. Preserve evidence cards and research-based-review disclaimer.'},
+      directions:'Use Rock narration as the master timeline. Tighten mistakes/dead air without flattening comedic pauses. Re-time B-roll to narration. Infomercial/on-camera Rock footage is visual-only unless explicitly approved. Preserve evidence cards and the research-based-review disclaimer.'},
     script:p.voiceChunks||'',brollPlan:p.broll||'',notes:p.notes||'',
     localAssets:localAssets.map(a=>({name:a.name,type:a.type,size:a.size})),
     cloudAssets:p.cloudAssets||[]
   };
-  const blob=new Blob([JSON.stringify(job,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(p.id||'review')+'-frontstage-job.json';a.click();URL.revokeObjectURL(a.href);
-  window.open('https://frontstage.studio/','_blank','noopener');
-});
+}
+function downloadJson(name,data){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
+async function writeTextFile(dir,name,text){
+  const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(text); await w.close();
+}
+async function writeBlobFile(dir,name,blob){
+  const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(blob); await w.close();
+}
+function safeMediaName(name,i){
+  const clean=String(name||('asset-'+i)).replace(/[\\/:*?"<>|]/g,'-').replace(/^\.+/,'').slice(0,120);
+  return (String(i+1).padStart(2,'0')+'-'+clean)||('asset-'+i);
+}
+async function mediaDuration(asset){
+  if(!asset?.blob || !(asset.type||'').match(/^(audio|video)\//)) return 5;
+  return new Promise(resolve=>{
+    const el=document.createElement((asset.type||'').startsWith('audio/')?'audio':'video');
+    const u=URL.createObjectURL(asset.blob); el.preload='metadata'; el.src=u;
+    const done=v=>{URL.revokeObjectURL(u);resolve(Number.isFinite(v)&&v>0?v:5);};
+    el.onloadedmetadata=()=>done(el.duration); el.onerror=()=>done(5);
+  });
+}
+function timeToSeconds(s){
+  const p=String(s).trim().split(':').map(Number); if(p.some(Number.isNaN)) return 0;
+  return p.length===3?p[0]*3600+p[1]*60+p[2]:p.length===2?p[0]*60+p[1]:p[0];
+}
+function brollMarkers(plan,fps){
+  const out=[]; const re=/(\d{1,2}:\d{2}(?::\d{2})?)\s*[–-]\s*(\d{1,2}:\d{2}(?::\d{2})?|END)\s+([^\n]+)/gi;
+  let m; while((m=re.exec(plan||''))){
+    const start=Math.round(timeToSeconds(m[1])*fps);
+    const end=m[2].toUpperCase()==='END'?start:Math.round(timeToSeconds(m[2])*fps);
+    out.push({id:crypto.randomUUID(),name:m[3].split('—')[0].trim().slice(0,60)||'B-roll',startFrame:start,durationFrames:Math.max(0,end-start),comment:m[3].trim(),status:'open'});
+  } return out;
+}
+async function writeFrontstageProject(dir,p,assets,job){
+  const fps=30, timelineId=crypto.randomUUID(), mediaDir=await dir.getDirectoryHandle('media',{create:true});
+  const entries=[], audioClips=[], videoClips=[]; let audioAt=0, visualAt=0;
+  for(let i=0;i<assets.length;i++){
+    const a=assets[i], type=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
+    if(!type) continue;
+    const name=safeMediaName(a.name,i), duration=await mediaDuration(a), id=crypto.randomUUID();
+    await writeBlobFile(mediaDir,name,a.blob);
+    entries.push({id,name:a.name||name,type,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:type==='audio'||type==='video'});
+    const frames=Math.max(1,Math.round(duration*fps));
+    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:type,sourceClipType:type,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:type==='audio'?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
+    if(type==='audio'){clip.startFrame=audioAt;audioAt+=frames;audioClips.push(clip);}
+    else {clip.startFrame=visualAt;visualAt+=frames;videoClips.push(clip);}
+  }
+  const tracks=[];
+  if(videoClips.length) tracks.push({id:crypto.randomUUID(),type:'video',name:'B-roll / visuals',muted:false,hidden:false,syncLocked:true,clips:videoClips});
+  if(audioClips.length) tracks.push({id:crypto.randomUUID(),type:'audio',name:'ROCK VO — MASTER',muted:false,hidden:false,syncLocked:true,clips:audioClips});
+  const timeline={id:timelineId,name:p.name+' — DBIY Edit',fps,width:1920,height:1080,settingsConfigured:true,tracks,markers:brollMarkers(p.broll,fps)};
+  const projectFile={schemaVersion:3,timelines:[timeline],activeTimelineId:timelineId,openTimelineIds:[timelineId],viewStates:{[timelineId]:{playheadFrame:0,zoomScale:1,scrollOffsetX:0}}};
+  await writeTextFile(dir,'project.json',JSON.stringify(projectFile,null,2));
+  await writeTextFile(dir,'media.json',JSON.stringify({version:2,entries,folders:[]},null,2));
+  await writeTextFile(dir,'generation-log.json',JSON.stringify({version:1,entries:[]},null,2));
+  await writeTextFile(dir,'DBIY-production-job.json',JSON.stringify(job,null,2));
+  await writeTextFile(dir,'README-DBIY.txt','Built by DON’T BUY IT YET Production Hub. Open this folder in Frontstage. ROCK VO — MASTER is the narration timeline. Timeline markers contain the B-roll/edit plan. Source-video audio is muted by default.');
+}
+
 document.getElementById('sendProjectCommandBtn').addEventListener('click',async()=>{
   if(!activeProjectId){alert('Save this review first, then send the command.');return;}
   const command=document.getElementById('projectCommand').value.trim();
