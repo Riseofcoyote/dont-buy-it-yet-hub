@@ -139,6 +139,24 @@ function brollMarkers(plan,fps){
     out.push({id:crypto.randomUUID(),name:m[3].split('—')[0].trim().slice(0,60)||'B-roll',startFrame:start,durationFrames:Math.max(0,end-start),comment:m[3].trim(),status:'open'});
   } return out;
 }
+async function narrationToWav(asset){
+  if(!asset?.blob) throw new Error('Narration file is missing.');
+  if((asset.type||'').startsWith('audio/wav')) return {blob:asset.blob,name:'ROCK-VO-MASTER.wav',type:'audio/wav'};
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC) throw new Error('This browser cannot convert narration audio.');
+  const ctx=new AC();
+  try{
+    const buf=await ctx.decodeAudioData(await asset.blob.arrayBuffer());
+    const rate=buf.sampleRate, frames=buf.length, channels=1;
+    const out=new ArrayBuffer(44+frames*2), v=new DataView(out);
+    const s=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+    s(0,'RIFF');v.setUint32(4,36+frames*2,true);s(8,'WAVE');s(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,channels,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);s(36,'data');v.setUint32(40,frames*2,true);
+    const n=buf.numberOfChannels, src=[];for(let ch=0;ch<n;ch++)src.push(buf.getChannelData(ch));
+    let o=44;for(let i=0;i<frames;i++){let x=0;for(let ch=0;ch<n;ch++)x+=src[ch][i];x=Math.max(-1,Math.min(1,x/n));v.setInt16(o,x<0?x*32768:x*32767,true);o+=2;}
+    return {blob:new Blob([out],{type:'audio/wav'}),name:'ROCK-VO-MASTER.wav',type:'audio/wav'};
+  } finally {try{await ctx.close();}catch{}}
+}
+
 async function writeFrontstageProject(dir,p,assets,job){
   const fps=30, timelineId=crypto.randomUUID(), mediaDir=await dir.getDirectoryHandle('media',{create:true});
   const entries=[], audioClips=[], videoClips=[]; let audioAt=0, visualAt=0;
@@ -146,12 +164,17 @@ async function writeFrontstageProject(dir,p,assets,job){
     const a=assets[i], sourceType=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
     if(!sourceType) continue;
     const isNarration=a.role==='narration-master';
-    const name=safeMediaName(a.name,i), duration=await mediaDuration(a), id=crypto.randomUUID();
-    await writeBlobFile(mediaDir,name,a.blob);
-    entries.push({id,name:a.name||name,type:sourceType,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:sourceType==='audio'||sourceType==='video'});
+    let exportAsset=a, exportType=sourceType;
+    if(isNarration && sourceType==='video'){
+      const wav=await narrationToWav(a);
+      exportAsset={...a,blob:wav.blob,name:wav.name,type:wav.type}; exportType='audio';
+    }
+    const name=safeMediaName(exportAsset.name,i), duration=await mediaDuration(exportAsset), id=crypto.randomUUID();
+    await writeBlobFile(mediaDir,name,exportAsset.blob);
+    entries.push({id,name:isNarration?'ROCK VO — MASTER':(exportAsset.name||name),type:exportType,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:exportType==='audio'||exportType==='video'});
     const frames=Math.max(1,Math.round(duration*fps));
-    const clipType=isNarration?'audio':sourceType;
-    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:clipType,sourceClipType:sourceType,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:(isNarration||sourceType==='audio')?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
+    const clipType=isNarration?'audio':exportType;
+    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:clipType,sourceClipType:exportType,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:(isNarration||sourceType==='audio')?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
     if(isNarration||sourceType==='audio'){clip.startFrame=audioAt;audioAt+=frames;audioClips.push(clip);}
     else {clip.startFrame=visualAt;visualAt+=frames;videoClips.push(clip);}
   }
