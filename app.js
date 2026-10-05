@@ -48,31 +48,35 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
   const p=projects.find(x=>x.id===activeProjectId);
   if(!p){alert('Open a saved review first.');return;}
   let localAssets=await getLocalAssets(p.id).catch(()=>[]);
-  let master=localAssets.find(a=>a.role==='narration-master');
-  if(!master){
-    const file=await chooseNarrationMaster();
-    if(!file) return;
-    await saveLocalAsset(p.id,file,'narration-master');
-    localAssets=await getLocalAssets(p.id).catch(()=>[]);
-    master=localAssets.find(a=>a.role==='narration-master');
-    await renderAssetGrid(p.id);
-  }
-  if(!master){alert('Narration master could not be loaded. No project was changed.');return;}
+  const master=localAssets.find(a=>a.role==='narration-master');
+  // Never reopen the Android file picker here. Narration is selected only with ROCK VO — MASTER.
+  if(!master){alert('ROCK VO — MASTER is not loaded yet. Use the ROCK VO — MASTER picker above, then tap Build Frontstage Project again.');return;}
+
+  const queueJob={id:crypto.randomUUID(),command:'Build Frontstage Project — ROCK VO — MASTER',provider:'frontstage',status:'Building',createdAt:new Date().toISOString()};
+  p.aiJobs=[...(p.aiJobs||[]),queueJob]; p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
   const job=makeFrontstageJob(p,localAssets);
   try{
     if('showDirectoryPicker' in window){
       const dir=await window.showDirectoryPicker({mode:'readwrite'});
       await writeFrontstageProject(dir,p,localAssets,job);
+      queueJob.status='Completed';
+      p.assistantOutput='Frontstage project built successfully with ROCK VO — MASTER as the narration timeline. Open the selected folder in Frontstage.';
       alert('Frontstage project built with ROCK VO — MASTER. Open this folder in Frontstage.');
     }else{
+      // Android/Chrome does not expose showDirectoryPicker. Keep the narration in IndexedDB,
+      // create a real visible queue result, and export the handoff without asking for the audio again.
       downloadJson((p.id||'review')+'-frontstage-job.json',job);
-      alert('Folder access is unavailable in this browser, so I prepared the production job instead.');
+      queueJob.status='Ready for Frontstage';
+      p.assistantOutput='ROCK VO — MASTER is saved. Android blocked direct folder creation, so the Frontstage handoff job was downloaded. Open Frontstage and import/open that downloaded job; do not select the narration again.';
+      alert('ROCK VO — MASTER is saved. Frontstage handoff downloaded — no need to choose the narration again.');
     }
+    p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
+    document.getElementById('assistantOutput').textContent=p.assistantOutput;
     window.open('https://frontstage.studio/','_blank','noopener');
   }catch(err){
-    if(err?.name==='AbortError') return;
-    console.error(err);
-    alert('Frontstage project creation was blocked. Your narration remains saved in the Hub; no project data was deleted.');
+    if(err?.name==='AbortError'){queueJob.status='Cancelled';}
+    else {console.error(err);queueJob.status='Blocked';p.assistantOutput='Frontstage project creation was blocked: '+(err?.message||'unknown browser error');alert('Frontstage project creation was blocked. Your narration remains saved in the Hub; no project data was deleted.');}
+    p.updatedAt=new Date().toISOString();saveProjects();renderJobQueue(p);document.getElementById('assistantOutput').textContent=p.assistantOutput||'';
   }
 });
 
