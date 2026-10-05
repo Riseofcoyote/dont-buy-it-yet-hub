@@ -47,26 +47,47 @@ document.getElementById('reloadCurrentCutBtn').addEventListener('click',()=>rend
 document.getElementById('exportFrontstageJobBtn').addEventListener('click',async()=>{
   const p=projects.find(x=>x.id===activeProjectId);
   if(!p){alert('Open a saved review first.');return;}
-  const localAssets=await getLocalAssets(p.id).catch(()=>[]);
+  let localAssets=await getLocalAssets(p.id).catch(()=>[]);
+  let master=localAssets.find(a=>a.role==='narration-master');
+  if(!master){
+    const file=await chooseNarrationMaster();
+    if(!file) return;
+    await saveLocalAsset(p.id,file,'narration-master');
+    localAssets=await getLocalAssets(p.id).catch(()=>[]);
+    master=localAssets.find(a=>a.role==='narration-master');
+    await renderAssetGrid(p.id);
+  }
+  if(!master){alert('Narration master could not be loaded. No project was changed.');return;}
   const job=makeFrontstageJob(p,localAssets);
   try{
     if('showDirectoryPicker' in window){
       const dir=await window.showDirectoryPicker({mode:'readwrite'});
       await writeFrontstageProject(dir,p,localAssets,job);
-      alert('Frontstage project built. In Frontstage choose File → Open and select the folder you just chose.');
+      alert('Frontstage project built with ROCK VO — MASTER. Open this folder in Frontstage.');
     }else{
       downloadJson((p.id||'review')+'-frontstage-job.json',job);
-      alert('Your browser does not expose project-folder access here, so I prepared the production job instead.');
+      alert('Folder access is unavailable in this browser, so I prepared the production job instead.');
     }
     window.open('https://frontstage.studio/','_blank','noopener');
   }catch(err){
     if(err?.name==='AbortError') return;
     console.error(err);
-    downloadJson((p.id||'review')+'-frontstage-job.json',job);
-    alert('Direct Frontstage project creation was blocked by the browser. I downloaded the production job as a fallback.');
-    window.open('https://frontstage.studio/','_blank','noopener');
+    alert('Frontstage project creation was blocked. Your narration remains saved in the Hub; no project data was deleted.');
   }
 });
+
+function chooseNarrationMaster(){
+  return new Promise(resolve=>{
+    const input=document.createElement('input');
+    input.type='file'; input.accept='audio/*,video/*'; input.style.display='none';
+    document.body.appendChild(input);
+    let settled=false;
+    const finish=file=>{if(settled)return;settled=true;input.remove();resolve(file||null);};
+    input.addEventListener('change',()=>finish(input.files?.[0]||null),{once:true});
+    window.addEventListener('focus',()=>setTimeout(()=>{if(!settled&&!input.files?.length)finish(null);},800),{once:true});
+    input.click();
+  });
+}
 
 function makeFrontstageJob(p,localAssets){
   return {
@@ -75,7 +96,7 @@ function makeFrontstageJob(p,localAssets){
     edit:{voiceoverIsMaster:true,keepSourceAudio:false,target:'1080p MP4',captions:true,
       directions:'Use Rock narration as the master timeline. Tighten mistakes/dead air without flattening comedic pauses. Re-time B-roll to narration. Infomercial/on-camera Rock footage is visual-only unless explicitly approved. Preserve evidence cards and the research-based-review disclaimer.'},
     script:p.voiceChunks||'',brollPlan:p.broll||'',notes:p.notes||'',
-    localAssets:localAssets.map(a=>({name:a.name,type:a.type,size:a.size})),
+    localAssets:localAssets.map(a=>({name:a.name,type:a.type,size:a.size,role:a.role||'asset'})),
     cloudAssets:p.cloudAssets||[]
   };
 }
@@ -118,14 +139,16 @@ async function writeFrontstageProject(dir,p,assets,job){
   const fps=30, timelineId=crypto.randomUUID(), mediaDir=await dir.getDirectoryHandle('media',{create:true});
   const entries=[], audioClips=[], videoClips=[]; let audioAt=0, visualAt=0;
   for(let i=0;i<assets.length;i++){
-    const a=assets[i], type=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
-    if(!type) continue;
+    const a=assets[i], sourceType=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
+    if(!sourceType) continue;
+    const isNarration=a.role==='narration-master';
     const name=safeMediaName(a.name,i), duration=await mediaDuration(a), id=crypto.randomUUID();
     await writeBlobFile(mediaDir,name,a.blob);
-    entries.push({id,name:a.name||name,type,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:type==='audio'||type==='video'});
+    entries.push({id,name:a.name||name,type:sourceType,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:sourceType==='audio'||sourceType==='video'});
     const frames=Math.max(1,Math.round(duration*fps));
-    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:type,sourceClipType:type,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:type==='audio'?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
-    if(type==='audio'){clip.startFrame=audioAt;audioAt+=frames;audioClips.push(clip);}
+    const clipType=isNarration?'audio':sourceType;
+    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:clipType,sourceClipType:sourceType,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:(isNarration||sourceType==='audio')?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
+    if(isNarration||sourceType==='audio'){clip.startFrame=audioAt;audioAt+=frames;audioClips.push(clip);}
     else {clip.startFrame=visualAt;visualAt+=frames;videoClips.push(clip);}
   }
   const tracks=[];
@@ -446,11 +469,11 @@ function openAssetDb(){
     req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
   });
 }
-async function saveLocalAsset(projectId,file){
+async function saveLocalAsset(projectId,file,role='asset'){
   const db=await openAssetDb();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(ASSET_STORE,'readwrite');
-    tx.objectStore(ASSET_STORE).put({id:crypto.randomUUID(),projectId,name:file.name,type:file.type,size:file.size,blob:file,createdAt:new Date().toISOString()});
+    tx.objectStore(ASSET_STORE).put({id:crypto.randomUUID(),projectId,name:file.name,type:file.type,size:file.size,blob:file,role,createdAt:new Date().toISOString()});
     tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
   });
 }
