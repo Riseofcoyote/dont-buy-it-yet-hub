@@ -75,7 +75,7 @@ function makeFrontstageJob(p,localAssets){
     edit:{voiceoverIsMaster:true,keepSourceAudio:false,target:'1080p MP4',captions:true,
       directions:'Use Rock narration as the master timeline. Tighten mistakes/dead air without flattening comedic pauses. Re-time B-roll to narration. Infomercial/on-camera Rock footage is visual-only unless explicitly approved. Preserve evidence cards and the research-based-review disclaimer.'},
     script:p.voiceChunks||'',brollPlan:p.broll||'',notes:p.notes||'',
-    localAssets:localAssets.map(a=>({name:a.name,type:a.type,size:a.size,role:a.role||'asset'})),
+    localAssets:localAssets.map(a=>({name:a.name,type:a.type,size:a.size})),
     cloudAssets:p.cloudAssets||[]
   };
 }
@@ -118,16 +118,14 @@ async function writeFrontstageProject(dir,p,assets,job){
   const fps=30, timelineId=crypto.randomUUID(), mediaDir=await dir.getDirectoryHandle('media',{create:true});
   const entries=[], audioClips=[], videoClips=[]; let audioAt=0, visualAt=0;
   for(let i=0;i<assets.length;i++){
-    const a=assets[i], sourceType=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
-    if(!sourceType) continue;
-    const isNarration=a.role==='narration-master';
+    const a=assets[i], type=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
+    if(!type) continue;
     const name=safeMediaName(a.name,i), duration=await mediaDuration(a), id=crypto.randomUUID();
     await writeBlobFile(mediaDir,name,a.blob);
-    entries.push({id,name:a.name||name,type:sourceType,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:sourceType==='audio'||sourceType==='video'});
+    entries.push({id,name:a.name||name,type,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:type==='audio'||type==='video'});
     const frames=Math.max(1,Math.round(duration*fps));
-    const clipType=isNarration?'audio':sourceType;
-    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:clipType,sourceClipType:sourceType,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:(isNarration||sourceType==='audio')?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
-    if(isNarration||sourceType==='audio'){clip.startFrame=audioAt;audioAt+=frames;audioClips.push(clip);}
+    const clip={id:crypto.randomUUID(),mediaRef:id,mediaType:type,sourceClipType:type,startFrame:0,durationFrames:frames,trimStartFrame:0,trimEndFrame:0,speed:1,volume:type==='audio'?1:0,fadeInFrames:0,fadeOutFrames:0,fadeInInterpolation:'linear',fadeOutInterpolation:'linear',opacity:1,transform:{centerX:.5,centerY:.5,width:1,height:1,rotation:0,flipHorizontal:false,flipVertical:false},crop:{left:0,top:0,right:0,bottom:0}};
+    if(type==='audio'){clip.startFrame=audioAt;audioAt+=frames;audioClips.push(clip);}
     else {clip.startFrame=visualAt;visualAt+=frames;videoClips.push(clip);}
   }
   const tracks=[];
@@ -148,10 +146,10 @@ document.getElementById('sendProjectCommandBtn').addEventListener('click',async(
   if(!command){alert('Enter a project command first.');return;}
   await queueAndShareCommand(activeProjectId,command,selectedProjectProvider);
 });
-document.getElementById('narrationMasterInput')?.addEventListener('change',async e=>{\n  if(!activeProjectId){alert('Open the saved review first.'); e.target.value=''; return;}\n  const file=e.target.files?.[0]; if(!file) return;\n  await saveLocalAsset(activeProjectId,file,'narration-master');\n  e.target.value=''; await renderAssetGrid(activeProjectId);\n  alert('Narration master loaded. Build Frontstage Project again when ready.');\n});\n\ndocument.getElementById('assetInput').addEventListener('change',async e=>{
+document.getElementById('assetInput').addEventListener('change',async e=>{
   if(!activeProjectId){alert('Save this review first, then add assets.'); e.target.value=''; return;}
   const files=[...(e.target.files||[])];
-  for(const file of files) await saveLocalAsset(activeProjectId,file,'asset');
+  for(const file of files) await saveLocalAsset(activeProjectId,file);
   e.target.value='';
   await renderAssetGrid(activeProjectId);
 });
@@ -448,11 +446,11 @@ function openAssetDb(){
     req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
   });
 }
-async function saveLocalAsset(projectId,file,role='asset'){
+async function saveLocalAsset(projectId,file){
   const db=await openAssetDb();
   return new Promise((resolve,reject)=>{
     const tx=db.transaction(ASSET_STORE,'readwrite');
-    tx.objectStore(ASSET_STORE).put({id:crypto.randomUUID(),projectId,name:file.name,type:file.type,size:file.size,blob:file,role,createdAt:new Date().toISOString()});
+    tx.objectStore(ASSET_STORE).put({id:crypto.randomUUID(),projectId,name:file.name,type:file.type,size:file.size,blob:file,createdAt:new Date().toISOString()});
     tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
   });
 }
@@ -485,7 +483,7 @@ async function renderAssetGrid(projectId){
     else if(a.type.startsWith('image/')) media=`<img src="${url}" alt="">`;
     else if(a.type.startsWith('audio/')) media=`<audio src="${url}" controls></audio>`;
     else media='<div class="empty">FILE</div>';
-    card.innerHTML=`${media}<button class="asset-remove" aria-label="Remove">×</button><div class="asset-info">${a.role==='narration-master'?'<strong>🎙️ MASTER VO</strong> • ':''}${escapeHtml(a.name)} • ${formatBytes(a.size)}</div>`;
+    card.innerHTML=`${media}<button class="asset-remove" aria-label="Remove">×</button><div class="asset-info">${escapeHtml(a.name)} • ${formatBytes(a.size)}</div>`;
     card.querySelector('.asset-remove').onclick=async()=>{await removeLocalAsset(a.id);URL.revokeObjectURL(url);renderAssetGrid(projectId);};
     grid.appendChild(card);
   });
