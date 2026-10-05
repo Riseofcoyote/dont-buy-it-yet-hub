@@ -169,6 +169,25 @@ document.getElementById('sendProjectCommandBtn').addEventListener('click',async(
   if(!command){alert('Enter a project command first.');return;}
   await queueAndShareCommand(activeProjectId,command,selectedProjectProvider);
 });
+const narrationMasterInput=document.getElementById('narrationMasterInput');
+if(narrationMasterInput){
+  narrationMasterInput.addEventListener('change',async e=>{
+    const file=e.target.files?.[0];
+    if(!file) return;
+    if(!activeProjectId){alert('Open the Roborock review first, then add the narration.');e.target.value='';return;}
+    try{
+      const existing=await getLocalAssets(activeProjectId).catch(()=>[]);
+      for(const a of existing.filter(a=>a.role==='narration-master')) await removeLocalAsset(a.id);
+      await saveLocalAsset(activeProjectId,file,'narration-master');
+      await renderAssetGrid(activeProjectId);
+      alert('ROCK VO — MASTER saved. Now tap Build Frontstage Project.');
+    }catch(err){
+      console.error(err);
+      alert('The narration could not be saved. No project data was changed.');
+    }
+  });
+}
+
 document.getElementById('assetInput').addEventListener('change',async e=>{
   if(!activeProjectId){alert('Save this review first, then add assets.'); e.target.value=''; return;}
   const files=[...(e.target.files||[])];
