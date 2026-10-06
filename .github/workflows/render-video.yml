@@ -1,0 +1,81 @@
+name: Render DBIY Video
+
+on:
+  workflow_dispatch:
+    inputs:
+      narration_url:
+        description: Direct HTTPS URL to ROCK VO master audio/video
+        required: true
+        type: string
+      project_name:
+        description: Project name
+        required: false
+        default: DBIY Review
+        type: string
+      background_url:
+        description: Optional direct HTTPS URL to a background/B-roll video
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Download ROCK VO master
+        env:
+          NARRATION_URL: ${{ inputs.narration_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output narration-source "$NARRATION_URL"
+          test -s narration-source
+          ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 narration-source
+
+      - name: Download optional background
+        if: ${{ inputs.background_url != '' }}
+        env:
+          BACKGROUND_URL: ${{ inputs.background_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output background-source "$BACKGROUND_URL"
+          test -s background-source
+
+      - name: Render 1080p MP4
+        env:
+          HAS_BACKGROUND: ${{ inputs.background_url != '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          if [ "$HAS_BACKGROUND" = "true" ]; then
+            ffmpeg -y -stream_loop -1 -i background-source -i narration-source \
+              -map 0:v:0 -map 1:a:0 \
+              -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p" \
+              -af "loudnorm=I=-16:TP=-1.5:LRA=11" \
+              -c:v libx264 -preset veryfast -crf 20 -c:a aac -b:a 192k -shortest -movflags +faststart \
+              output/DBIY-render.mp4
+          else
+            ffmpeg -y -f lavfi -i "color=c=black:s=1920x1080:r=30" -i narration-source \
+              -map 0:v:0 -map 1:a:0 \
+              -af "loudnorm=I=-16:TP=-1.5:LRA=11" \
+              -c:v libx264 -preset veryfast -crf 20 -c:a aac -b:a 192k -shortest -movflags +faststart \
+              output/DBIY-render.mp4
+          fi
+          ffprobe -v error -show_entries format=duration,size -of json output/DBIY-render.mp4 > output/render-info.json
+
+      - name: Upload finished MP4
+        uses: actions/upload-artifact@v4
+        with:
+          name: DBIY-finished-video
+          path: |
+            output/DBIY-render.mp4
+            output/render-info.json
+          if-no-files-found: error
+          retention-days: 7
