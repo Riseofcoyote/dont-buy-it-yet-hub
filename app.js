@@ -56,7 +56,8 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
   p.aiJobs=[...(p.aiJobs||[]),queueJob]; p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
   const job=makeFrontstageJob(p,localAssets);
   try{
-    if('showDirectoryPicker' in window){
+    const isAndroid=/Android/i.test(navigator.userAgent);
+    if(!isAndroid && 'showDirectoryPicker' in window){
       const dir=await window.showDirectoryPicker({mode:'readwrite'});
       await writeFrontstageProject(dir,p,localAssets,job);
       queueJob.status='Completed';
