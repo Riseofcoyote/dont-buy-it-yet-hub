@@ -97,7 +97,7 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
     }
     p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
     document.getElementById('assistantOutput').textContent=p.assistantOutput;
-    if(!useZip) window.open('https://frontstage.studio/','_blank','noopener');
+    // Frontstage is opened manually after the downloaded project ZIP is extracted.
   }catch(err){
     if(err?.name==='AbortError'){queueJob.status='Cancelled';}
     else {console.error(err);queueJob.status='Blocked';p.assistantOutput='Frontstage project creation was blocked: '+(err?.message||'unknown browser error');alert('Frontstage project creation was blocked. Your narration remains saved in the Hub; no project data was deleted.');}
