@@ -524,7 +524,7 @@ function renderCurrentCut(p){
   open.href=url; open.style.pointerEvents=''; open.style.opacity='';
   host.innerHTML='';
   const frame=document.createElement('iframe');
-  frame.src=url;
+  frame.src=url.replace(/share\.descript\.com\/view\//i,'share.descript.com/embed/');
   frame.title=(p?.name||'Current review')+' current cut';
   frame.allow='autoplay; fullscreen; picture-in-picture';
   frame.allowFullscreen=true;
@@ -618,7 +618,7 @@ async function renderAssetGrid(projectId){
     else if(a.type.startsWith('image/')) media=`<img src="${url}" alt="">`;
     else if(a.type.startsWith('audio/')) media=`<audio src="${url}" controls></audio>`;
     else media='<div class="empty">FILE</div>';
-    card.innerHTML=`${media}<button class="asset-remove" aria-label="Remove">×</button><div class="asset-info">${escapeHtml(a.name)} • ${formatBytes(a.size)}</div>`;
+    card.innerHTML=`${media}<button class="asset-remove" aria-label="Remove">×</button><div class="asset-info">${a.role==='narration-master'?'🎙️ ROCK VO — MASTER • ':''}${escapeHtml(a.name)} • ${formatBytes(a.size)}</div>`;
     card.querySelector('.asset-remove').onclick=async()=>{await removeLocalAsset(a.id);URL.revokeObjectURL(url);renderAssetGrid(projectId);};
     grid.appendChild(card);
   });
