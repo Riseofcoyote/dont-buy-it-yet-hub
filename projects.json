@@ -30,10 +30,17 @@
         "https://web.descript.com/76e61539-d9ee-4576-85c1-5e68c10c6c6a/81f31",
         "https://share.descript.com/view/VLOOSecJUBv"
       ],
-      "aiJobs": [],
-      "assistantOutput": "Frontstage rebuild in progress. ROCK VO master narration is the next required media input; project is not Ready to Post until the narration-led edit is rebuilt and reviewed.",
+      "aiJobs": [
+        {
+          "id": "12cb45a0-dfde-42f2-9d51-ebd8987bab7d",
+          "status": "Completed",
+          "result": "Current project reviewed. Priority is to use 01-01-ROCK-VO-MASTER.wav as the narration master and assemble the Frontstage edit before any further research or publishing.",
+          "updatedAt": "2026-10-06T02:44:48.061Z"
+        }
+      ],
+      "assistantOutput": "Review complete. Single most important next action: import/select local 01-01-ROCK-VO-MASTER.wav as 🎙 ROCK VO — MASTER and build the narration-led Frontstage edit/project. The script, B-roll plan, Descript cut, and independent-review evidence are already in place; do not spend time on more research or publishing yet. After the VO-led edit is assembled, review sync/pacing and then export.",
       "createdAt": "2026-10-02T20:55:00-04:00",
-      "updatedAt": "2026-10-05T20:40:00Z",
+      "updatedAt": "2026-10-06T02:44:48.061Z",
       "dropboxFolder": "/DON'T BUY IT YET/Roborock Qrevo 2 Pro"
     }
   ]
