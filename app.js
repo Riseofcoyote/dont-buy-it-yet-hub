@@ -63,12 +63,17 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
       p.assistantOutput='Frontstage project built successfully with ROCK VO — MASTER as the narration timeline. Open the selected folder in Frontstage.';
       alert('Frontstage project built with ROCK VO — MASTER. Open this folder in Frontstage.');
     }else{
-      // Android/Chrome does not expose showDirectoryPicker. Keep the narration in IndexedDB,
-      // create a real visible queue result, and export the handoff without asking for the audio again.
-      downloadJson((p.id||'review')+'-frontstage-job.json',job);
+      // Android/Chrome has no folder picker. Build the exact same Frontstage project folder
+      // in memory (original narration MP4/AAC included, untouched) and download it as one .zip.
+      const folder=String(p.name||'review').replace(/[^A-Za-z0-9_-]+/g,'-').replace(/^-+|-+$/g,'')+'-Frontstage';
+      const zdir=zipDirectory(folder+'/');
+      await writeFrontstageProject(zdir,p,localAssets,job);
+      queueJob.status='Packaging'; renderJobQueue(p);
+      const zip=await buildZip(zdir.files);
+      downloadBlob(folder+'.zip',zip);
       queueJob.status='Ready for Frontstage';
-      p.assistantOutput='ROCK VO — MASTER is saved. Android blocked direct folder creation, so the Frontstage handoff job was downloaded. Open Frontstage and import/open that downloaded job; do not select the narration again.';
-      alert('ROCK VO — MASTER is saved. Frontstage handoff downloaded — no need to choose the narration again.');
+      p.assistantOutput='Frontstage project packaged as '+folder+'.zip ('+(zip.size/1048576).toFixed(1)+' MB) with the original ROCK VO — MASTER recording inside. Extract the zip, then open the extracted '+folder+' folder in Frontstage.';
+      alert('Frontstage project downloaded as '+folder+'.zip with ROCK VO — MASTER inside. Extract it, then open the folder in Frontstage.');
     }
     p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
     document.getElementById('assistantOutput').textContent=p.assistantOutput;
@@ -104,6 +109,52 @@ function makeFrontstageJob(p,localAssets){
     cloudAssets:p.cloudAssets||[]
   };
 }
+const CRC_TABLE=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+async function blobCrc32(blob){
+  let crc=0xFFFFFFFF; const reader=blob.stream().getReader();
+  for(;;){const {done,value}=await reader.read(); if(done) break; for(let i=0;i<value.length;i++) crc=CRC_TABLE[(crc^value[i])&0xFF]^(crc>>>8);}
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function dosDateTime(d){return {time:(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),date:((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate()};}
+// Uncompressed (store) ZIP built from Blob parts, so a large narration MP4 is never copied in memory.
+async function buildZip(files){
+  const enc=new TextEncoder(), parts=[], central=[], {time,date}=dosDateTime(new Date()); let offset=0;
+  for(const f of files){
+    const name=enc.encode(f.path), size=f.blob.size, crc=await blobCrc32(f.blob);
+    if(size>=0xFFFFFFFF||offset+30+name.length+size>=0xFFFFFFFF) throw new Error('Project is too large to package as a zip (4 GB limit).');
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);lh.setUint16(10,time,true);lh.setUint16(12,date,true);
+    lh.setUint32(14,crc,true);lh.setUint32(18,size,true);lh.setUint32(22,size,true);lh.setUint16(26,name.length,true);lh.setUint16(28,0,true);
+    parts.push(lh.buffer,name,f.blob);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(10,0,true);ch.setUint16(12,time,true);ch.setUint16(14,date,true);
+    ch.setUint32(16,crc,true);ch.setUint32(20,size,true);ch.setUint32(24,size,true);ch.setUint16(28,name.length,true);ch.setUint16(30,0,true);ch.setUint16(32,0,true);
+    ch.setUint16(34,0,true);ch.setUint16(36,0,true);ch.setUint32(38,0,true);ch.setUint32(42,offset,true);
+    central.push(ch.buffer,name);
+    offset+=30+name.length+size;
+  }
+  const cdSize=central.reduce((n,x)=>n+x.byteLength,0), end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);end.setUint32(12,cdSize,true);end.setUint32(16,offset,true);
+  return new Blob([...parts,...central,end.buffer],{type:'application/zip'});
+}
+// Stand-in for a folder handle: writeFrontstageProject writes into it exactly as it would a real folder.
+function zipDirectory(prefix='',files=[]){
+  return {files,
+    async getDirectoryHandle(name){return zipDirectory(prefix+name+'/',files);},
+    async getFileHandle(name){const path=prefix+name;return {async createWritable(){const chunks=[];return {
+      async write(d){chunks.push(d);},
+      async close(){const blob=new Blob(chunks),i=files.findIndex(f=>f.path===path);if(i>=0)files[i]={path,blob};else files.push({path,blob});}};}};}
+  };
+}
+function downloadBlob(name,blob){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),120000); // large files need time to save on Android
+}
+function assetMime(a){
+  if(a?.type) return a.type;
+  const ext=String(a?.name||'').toLowerCase().split('.').pop();
+  return {mp4:'video/mp4',m4v:'video/mp4',mov:'video/quicktime',webm:'video/webm',mkv:'video/x-matroska',m4a:'audio/mp4',aac:'audio/aac',mp3:'audio/mpeg',wav:'audio/wav',ogg:'audio/ogg',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif'}[ext]||'';
+}
 function downloadJson(name,data){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
@@ -118,14 +169,26 @@ function safeMediaName(name,i){
   const clean=String(name||('asset-'+i)).replace(/[\\/:*?"<>|]/g,'-').replace(/^\.+/,'').slice(0,120);
   return (String(i+1).padStart(2,'0')+'-'+clean)||('asset-'+i);
 }
-async function mediaDuration(asset){
+async function mediaDuration(asset,required=false){
   if(!asset?.blob || !(asset.type||'').match(/^(audio|video)\//)) return 5;
-  return new Promise(resolve=>{
+  const v=await new Promise(resolve=>{
     const el=document.createElement((asset.type||'').startsWith('audio/')?'audio':'video');
-    const u=URL.createObjectURL(asset.blob); el.preload='metadata'; el.src=u;
-    const done=v=>{URL.revokeObjectURL(u);resolve(Number.isFinite(v)&&v>0?v:5);};
-    el.onloadedmetadata=()=>done(el.duration); el.onerror=()=>done(5);
+    const u=URL.createObjectURL(asset.blob); let settled=false;
+    const done=x=>{if(settled)return;settled=true;clearTimeout(timer);URL.revokeObjectURL(u);resolve(x);};
+    const timer=setTimeout(()=>done(NaN),20000);
+    el.preload='metadata'; el.muted=true;
+    el.onloadedmetadata=()=>{
+      if(Number.isFinite(el.duration)&&el.duration>0) return done(el.duration);
+      // Some Android recordings report Infinity until the end of the file is probed.
+      el.ondurationchange=()=>{if(Number.isFinite(el.duration)&&el.duration>0) done(el.duration);};
+      try{el.currentTime=1e9;}catch{done(NaN);}
+    };
+    el.onerror=()=>done(NaN);
+    el.src=u;
   });
+  if(Number.isFinite(v)&&v>0) return v;
+  if(required) throw new Error('Could not read the length of '+(asset.name||'the narration file')+'. No project was built. Re-select ROCK VO — MASTER and try again.');
+  return 5;
 }
 function timeToSeconds(s){
   const p=String(s).trim().split(':').map(Number); if(p.some(Number.isNaN)) return 0;
@@ -161,7 +224,7 @@ async function writeFrontstageProject(dir,p,assets,job){
   const fps=30, timelineId=crypto.randomUUID(), mediaDir=await dir.getDirectoryHandle('media',{create:true});
   const entries=[], audioClips=[], videoClips=[]; let audioAt=0, visualAt=0;
   for(let i=0;i<assets.length;i++){
-    const a=assets[i], sourceType=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
+    const a={...assets[i],type:assetMime(assets[i])}, sourceType=(a.type||'').startsWith('audio/')?'audio':(a.type||'').startsWith('image/')?'image':(a.type||'').startsWith('video/')?'video':null;
     if(!sourceType) continue;
     const isNarration=a.role==='narration-master';
     let exportAsset=a, exportType=sourceType;
@@ -172,7 +235,7 @@ async function writeFrontstageProject(dir,p,assets,job){
       // Frontstage extracts/decodes the embedded AAC itself.
       exportAsset=a; exportType='video';
     }
-    const name=safeMediaName(exportAsset.name,i), duration=await mediaDuration(exportAsset), id=crypto.randomUUID();
+    const name=safeMediaName(exportAsset.name,i), duration=await mediaDuration(exportAsset,isNarration), id=crypto.randomUUID();
     await writeBlobFile(mediaDir,name,exportAsset.blob);
     entries.push({id,name:isNarration?'ROCK VO — MASTER':(exportAsset.name||name),type:exportType,source:{kind:'project',relativePath:'media/'+name},duration,hasAudio:exportType==='audio'||exportType==='video'});
     const frames=Math.max(1,Math.round(duration*fps));
