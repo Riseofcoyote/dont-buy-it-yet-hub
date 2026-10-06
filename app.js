@@ -44,6 +44,23 @@ document.getElementById('shareTaskBtn').addEventListener('click',async()=>{
 });
 document.getElementById('syncChatGPTBtn').addEventListener('click',syncFromGitHub);
 document.getElementById('reloadCurrentCutBtn').addEventListener('click',()=>renderCurrentCut(projects.find(x=>x.id===activeProjectId)));
+const HUB_BUILD='hub-build-12 android-zip';
+// True on phones/tablets — including Android Chrome in "Desktop site" mode, which removes
+// the word "Android" from the user agent but is still a touch-only screen.
+function isMobileDevice(){
+  const ua=navigator.userAgent||'';
+  if(/Android|iPhone|iPad|iPod|Mobile|Silk|Kindle|SamsungBrowser/i.test(ua)) return true;
+  const uad=navigator.userAgentData;
+  if(uad && (uad.mobile || /Android/i.test(uad.platform||''))) return true;
+  const mq=q=>!!(window.matchMedia && window.matchMedia(q).matches);
+  if((navigator.maxTouchPoints||0)>0 && mq('(pointer: coarse)') && !mq('(any-pointer: fine)')) return true;
+  return false;
+}
+// The ONLY place the Hub may open a system folder picker. Hard-blocked on mobile.
+async function pickProjectFolder(){
+  if(isMobileDevice()) throw new Error('Folder picker is disabled on mobile. The Hub uses the ZIP download instead.');
+  return window.showDirectoryPicker({mode:'readwrite'});
+}
 document.getElementById('exportFrontstageJobBtn').addEventListener('click',async()=>{
   const p=projects.find(x=>x.id===activeProjectId);
   if(!p){alert('Open a saved review first.');return;}
@@ -56,9 +73,11 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
   p.aiJobs=[...(p.aiJobs||[]),queueJob]; p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
   const job=makeFrontstageJob(p,localAssets);
   try{
-    const isAndroid=/Android/i.test(navigator.userAgent);
-    if(!isAndroid && 'showDirectoryPicker' in window){
-      const dir=await window.showDirectoryPicker({mode:'readwrite'});
+    // One decision, made before anything can open a folder picker. Phones/tablets always get the ZIP.
+    const useZip=isMobileDevice() || !('showDirectoryPicker' in window);
+    console.info('[DBIY] Build Frontstage Project', HUB_BUILD, useZip?'ZIP path':'folder path', navigator.userAgent);
+    if(!useZip){
+      const dir=await pickProjectFolder();
       await writeFrontstageProject(dir,p,localAssets,job);
       queueJob.status='Completed';
       p.assistantOutput='Frontstage project built successfully with ROCK VO — MASTER as the narration timeline. Open the selected folder in Frontstage.';
@@ -72,9 +91,9 @@ document.getElementById('exportFrontstageJobBtn').addEventListener('click',async
       queueJob.status='Packaging'; renderJobQueue(p);
       const zip=await buildZip(zdir.files);
       downloadBlob(folder+'.zip',zip);
-      queueJob.status='Ready for Frontstage';
-      p.assistantOutput='Frontstage project packaged as '+folder+'.zip ('+(zip.size/1048576).toFixed(1)+' MB) with the original ROCK VO — MASTER recording inside. Extract the zip, then open the extracted '+folder+' folder in Frontstage.';
-      alert('Frontstage project downloaded as '+folder+'.zip with ROCK VO — MASTER inside. Extract it, then open the folder in Frontstage.');
+      queueJob.status='Ready for Frontstage'; queueJob.path='zip';
+      p.assistantOutput='Frontstage project packaged as '+folder+'.zip ('+(zip.size/1048576).toFixed(1)+' MB) with the original ROCK VO — MASTER recording inside. Extract the zip, then open the extracted '+folder+' folder in Frontstage. ['+HUB_BUILD+']';
+      alert('Frontstage project downloaded as '+folder+'.zip ('+(zip.size/1048576).toFixed(1)+' MB) with ROCK VO — MASTER inside. Extract it, then open the folder in Frontstage.\n\n['+HUB_BUILD+']');
     }
     p.updatedAt=new Date().toISOString(); saveProjects(); renderJobQueue(p);
     document.getElementById('assistantOutput').textContent=p.assistantOutput;
